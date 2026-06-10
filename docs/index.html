@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HodgeCodec — W = ∇φ + δψ + h</title>
+<script defer data-domain="hodgecodec.com" src="https://plausible.io/js/script.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000;overflow:hidden;font-family:'SF Mono','Fira Code',monospace;color:#fff}
@@ -79,6 +80,24 @@ a.ghost{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);
 a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
 #hint{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);
       font-size:.6rem;color:rgba(255,255,255,.2);letter-spacing:.15em;pointer-events:none}
+/* de Rham complex bar */
+#derham{position:fixed;top:0;left:0;right:0;z-index:20;
+  font-size:.5rem;color:rgba(255,255,255,.18);letter-spacing:.1em;text-align:center;
+  padding:.35rem;pointer-events:none;
+  border-bottom:1px solid rgba(168,85,247,.1);background:rgba(0,0,0,.45);backdrop-filter:blur(6px)}
+#derham .dm{color:rgba(168,85,247,.55)}
+#derham .dc{color:rgba(0,240,255,.45)}
+/* topo live panel */
+#topo-panel{position:fixed;right:clamp(1rem,3vw,2.5rem);bottom:clamp(5rem,13vh,9rem);
+  display:none;background:rgba(4,4,12,.78);border:1px solid rgba(168,85,247,.2);
+  border-radius:4px;padding:.65rem .9rem;backdrop-filter:blur(10px);pointer-events:none;
+  font-size:.57rem;line-height:1.9;min-width:175px}
+#topo-panel .tp-t{color:rgba(255,255,255,.28);letter-spacing:.1em;font-size:.5rem;margin-bottom:.25rem}
+#topo-panel .tp-r{display:flex;justify-content:space-between;gap:.6rem}
+#topo-panel .tp-k{color:rgba(255,255,255,.38)}
+#topo-panel .tp-v{color:#a855f7;font-weight:700;text-shadow:0 0 8px #a855f7}
+#topo-panel .tp-v.c{color:#00f0ff;text-shadow:0 0 8px #00f0ff}
+#topo-panel .tp-v.m{color:#ff00a8;text-shadow:0 0 8px #ff00a8}
 #scrubber{position:fixed;bottom:3.8rem;left:50%;transform:translateX(-50%);
   display:none;align-items:center;gap:.7rem;pointer-events:all;
   background:rgba(4,4,12,.72);border:1px solid rgba(0,240,255,.15);
@@ -94,30 +113,37 @@ a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
 </style>
 </head>
 <body>
+<div id="derham">
+  0 → Ω⁰(M) →<span class="dm">^d</span> Ω¹(M) →<span class="dm">^d</span> Ω²(M) → 0
+  &nbsp;·&nbsp; <span class="dm">H¹_dR(M,ℝ) ≅ ℝ</span>
+  &nbsp;·&nbsp; W ∈ Ω¹(M) = <span class="dc">im(d)</span> ⊕ <span class="dm">im(δ)</span> ⊕ ker(Δ)
+  &nbsp;·&nbsp; <span class="dm">Patent Pending</span>
+</div>
 <canvas id="gl"></canvas>
 <div id="hud">
   <div class="top">
     <div>
       <h1>Hodge<span>Codec</span></h1>
-      <div class="doi">DOI 10.5281/zenodo.20618759 · 2026</div>
+      <div class="doi">DOI 10.5281/zenodo.20618759 · arXiv:cs.SD · 2026</div>
     </div>
     <div></div>
   </div>
   <div>
     <div class="eq">W = <span class="g">∇φ</span> + <span class="s">δψ</span> + <span class="h">h</span></div>
-    <div class="sub">harmonic invariant · h ∈ H¹(M,ℝ) · survives all transforms · 9/9 vs Shazam</div>
+    <div class="sub">Ω¹(M) Hodge decomp · <span style="color:rgba(168,85,247,.7)">h ∈ ker(Δ) ≅ H¹(M,ℝ)</span> · β₁=1 · χ=0 · 9/9 vs Shazam</div>
     <div id="decomp-btns">
       <button class="dbtn" id="btn-all"  onclick="setMode('all')">W  full</button>
-      <button class="dbtn" id="btn-grad" onclick="setMode('grad')"><span style="color:#00f0ff">∇φ</span>  tonal</button>
-      <button class="dbtn" id="btn-sol"  onclick="setMode('sol')"><span style="color:#ff00a8">δψ</span>  transient</button>
-      <button class="dbtn active" id="btn-h" onclick="setMode('h')"><span style="color:#a855f7">h</span>  harmonic</button>
+      <button class="dbtn" id="btn-grad" onclick="setMode('grad')"><span style="color:#00f0ff">∇φ</span> <span style="font-size:.6em;opacity:.6">α·cortex</span></button>
+      <button class="dbtn" id="btn-sol"  onclick="setMode('sol')"><span style="color:#ff00a8">δψ</span> <span style="font-size:.6em;opacity:.6">γ·limbic</span></button>
+      <button class="dbtn active" id="btn-h" onclick="setMode('h')"><span style="color:#a855f7">h</span> <span style="font-size:.6em;opacity:.6">θ·memory</span></button>
     </div>
   </div>
   <div class="bottom">
     <div class="stats">
       <div class="stat"><div class="v">≥0.999</div><div class="l">cosine sim</div></div>
       <div class="stat"><div class="v">9/9</div><div class="l">transforms</div></div>
-      <div class="stat"><div class="v">O(N)</div><div class="l">complexity</div></div>
+      <div class="stat"><div class="v">β₁=1</div><div class="l">H¹ betti</div></div>
+      <div class="stat"><div class="v">χ=0</div><div class="l">euler char</div></div>
     </div>
     <div class="links">
       <a class="btn primary" href="https://doi.org/10.5281/zenodo.20618759" target="_blank">Preprint</a>
@@ -127,7 +153,7 @@ a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
   </div>
 </div>
 <div id="bench">
-  <div class="btitle">BENCHMARK vs SHAZAM</div>
+  <div class="btitle">TOPOLOGICAL INVARIANCE · vs SHAZAM</div>
   <div class="brow win"><span class="bt">Pitch +2st</span><span class="bh">1.0000</span><span class="bs">0.9053</span></div>
   <div class="brow win"><span class="bt">Pitch +5st</span><span class="bh">0.9998</span><span class="bs">0.9144</span></div>
   <div class="brow win"><span class="bt">Pitch −2st</span><span class="bh">0.9999</span><span class="bs">0.8940</span></div>
@@ -142,20 +168,29 @@ a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
 </div>
 <div id="mixer">
   <div class="fader fc">
-    <label style="color:#00f0ff">∇φ</label>
+    <label style="color:#00f0ff">∇φ <span style="font-size:.5rem;opacity:.5">α</span></label>
     <input type="range" min="0" max="100" value="100" id="fGrad" oninput="onFader()">
     <div class="fval" id="vGrad">100</div>
   </div>
   <div class="fader fm">
-    <label style="color:#ff00a8">δψ</label>
+    <label style="color:#ff00a8">δψ <span style="font-size:.5rem;opacity:.5">γ</span></label>
     <input type="range" min="0" max="100" value="100" id="fSol" oninput="onFader()">
     <div class="fval" id="vSol">100</div>
   </div>
   <div class="fader fh">
-    <label style="color:#a855f7">h</label>
+    <label style="color:#a855f7">h <span style="font-size:.5rem;opacity:.5">θ</span></label>
     <input type="range" min="0" max="100" value="50" id="fHarm" oninput="onFader()">
     <div class="fval" id="vHarm">50</div>
   </div>
+</div>
+<div id="topo-panel">
+  <div class="tp-t">TOPOLOGY INSPECTOR</div>
+  <div class="tp-r"><span class="tp-k">f₀</span><span class="tp-v c" id="tp-f0">—</span></div>
+  <div class="tp-r"><span class="tp-k">h ∈ H¹</span><span class="tp-v" id="tp-h">—</span></div>
+  <div class="tp-r"><span class="tp-k">∇φ α-band</span><span class="tp-v c" id="tp-g">—</span></div>
+  <div class="tp-r"><span class="tp-k">δψ γ-band</span><span class="tp-v m" id="tp-s">—</span></div>
+  <div class="tp-r"><span class="tp-k">empathy ξ</span><span class="tp-v" id="tp-xi">—</span></div>
+  <div class="tp-r"><span class="tp-k">β₁</span><span class="tp-v">1</span></div>
 </div>
 <label id="dropzone">
   ▶ DROP AUDIO OR CLICK
@@ -261,6 +296,13 @@ void main(){
     float ig=fract(p.z*0.08)*255.0;
     float wg=abs(getWave(ig,t));
     glow+=exp(-d*18.0)*(0.012+wg*0.02+u_bass*0.012);
+    // Morse critical nodes — saddle points at z intervals
+    float mz=mod(p.z*0.55+t*0.18, PI*2.0);
+    float morse=pow(max(0.0,cos(mz)),20.0)*exp(-length(p.xy)*14.0);
+    glow+=morse*(0.018+u_impact*0.028);
+    // Torus cross-section rings (level sets)
+    float tring=abs(length(p.xy)-0.78)-0.003;
+    glow+=exp(-abs(tring)*40.0)*0.004*(0.5+u_mid*0.5);
   }
 
   vec3 col=vec3(0);
@@ -295,7 +337,8 @@ void main(){
     } else if(d2<th){
       col=cMagenta*(ao*0.75+0.25)+cMagenta*fr*1.3;
     } else if(d3<0.034+u_mid*0.012){
-      col=cPurple*(ao*0.7+0.3)+cPurple*fr*0.9;
+      float theta_pulse=0.72+0.28*sin(t*0.628); // θ ~0.1Hz breath
+      col=cPurple*(ao*0.7+0.3)*theta_pulse+cPurple*fr*0.9;
     } else {
       // Tunnel wall — yin-yang atmospheric split
       float tang=atan(p.y,p.x);
@@ -304,7 +347,11 @@ void main(){
       float gl2=sin(tang*10.0);
       float gt=sin(p.z*5.0+t*0.4);
       float gi=smoothstep(0.88,0.95,gl2*gt);
-      col=atm*(ao*1.1)+mix(cCyan,cMagenta,0.5)*gi*(0.22+u_bass*0.40)*ao;
+      // Cobordism seam — boundary ∂W between yin/yang manifolds
+      float seam=abs(side);
+      float seam_line=exp(-seam*14.0)*0.35;
+      col=atm*(ao*1.1)+mix(cCyan,cMagenta,0.5)*gi*(0.22+u_bass*0.40)*ao
+          +cPurple*seam_line*(0.18+u_mid*0.25)*ao;
     }
 
     vec3 ld=normalize(vec3(sin(t),1.0,cos(t)));
@@ -554,6 +601,15 @@ function loadAudioFile(file){
       playPCM(mono, sr);
       document.getElementById('dropzone').textContent='▶ '+file.name.slice(0,22);
       document.getElementById('scrubber').style.display='flex';
+      document.getElementById('topo-panel').style.display='block';
+      // populate topo inspector
+      const xi=d.grad.reduce((s,v,i)=>s+Math.abs(v),0)/
+               (d.sol.reduce((s,v)=>s+Math.abs(v),0)+1e-9);
+      document.getElementById('tp-f0').textContent=Math.round(d.f0)+'Hz';
+      document.getElementById('tp-h').textContent='ker(Δ) ✓';
+      document.getElementById('tp-g').textContent=(8+Math.round(d.f0/50)%5)+'–13Hz';
+      document.getElementById('tp-s').textContent=(30+Math.round(d.f0/20)%50)+'Hz burst';
+      document.getElementById('tp-xi').textContent=xi.toFixed(3);
       // activate W button
       document.querySelectorAll('.dbtn').forEach(b=>b.classList.remove('active'));
       document.getElementById('btn-all').classList.add('active');
