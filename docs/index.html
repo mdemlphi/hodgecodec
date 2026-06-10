@@ -318,24 +318,55 @@ const U = {};
   .forEach(n => U[n] = gl.getUniformLocation(prog, n));
 
 // ── Hodge decomposition in JS (Thomas O(N) solver, same as Rust) ────────────
-function hodgeDecompose(pcm){
-  const n=pcm.length;
-  const h=pcm.reduce((a,b)=>a+b,0)/n;           // harmonic = mean
-  const c=pcm.map(x=>x-h);                        // centered
-  // Thomas smooth (λ=3, Neumann BC)
-  const lam=3, a=-lam, b0=1+lam, bm=1+2*lam;
+// Thomas O(N) smoother — λ controls smoothness (higher = smoother)
+function thomasSmooth(c, lam){
+  const n=c.length;
+  const a=-lam, b0=1+lam, bm=1+2*lam;
   const cp=new Float32Array(n), dp=new Float32Array(n);
   cp[0]=a/b0; dp[0]=c[0]/b0;
   for(let i=1;i<n-1;i++){const D=bm-a*cp[i-1];cp[i]=a/D;dp[i]=(c[i]-a*dp[i-1])/D;}
   const Dn=b0-a*cp[n-2]; dp[n-1]=(c[n-1]-a*dp[n-2])/Dn;
-  const grad=new Float32Array(n);
-  grad[n-1]=dp[n-1];
-  for(let i=n-2;i>=0;i--) grad[i]=dp[i]-cp[i]*grad[i+1];
+  const x=new Float32Array(n); x[n-1]=dp[n-1];
+  for(let i=n-2;i>=0;i--) x[i]=dp[i]-cp[i]*x[i+1];
+  return x;
+}
+
+// Dominant frequency via autocorrelation (YIN-lite)
+function dominantFreq(pcm, sr){
+  const minP=Math.floor(sr/800), maxP=Math.floor(sr/60);
+  let bestP=minP, bestCorr=-1;
+  for(let p=minP;p<maxP&&p<pcm.length/2;p++){
+    let c=0;
+    for(let i=0;i<2048&&i+p<pcm.length;i++) c+=pcm[i]*pcm[i+p];
+    if(c>bestCorr){bestCorr=c;bestP=p;}
+  }
+  return sr/bestP;
+}
+
+function hodgeDecompose(pcm, sr){
+  const n=pcm.length;
+  const mean=pcm.reduce((a,b)=>a+b,0)/n;
+  const c=new Float32Array(n); for(let i=0;i<n;i++) c[i]=pcm[i]-mean;
+
+  // ∇φ — Thomas smooth (λ=3)
+  const grad=thomasSmooth(c,3);
+
+  // δψ — solenoidal residual with threshold
   const sol=new Float32Array(n);
   const THR=1e-3;
-  for(let i=0;i<n;i++){let s=c[i]-grad[i]; sol[i]=Math.abs(s)<THR?0:s;}
-  const hArr=new Float32Array(n).fill(h);
-  return {grad, sol, harm:hArr, h};
+  for(let i=0;i<n;i++){const s=c[i]-grad[i]; sol[i]=Math.abs(s)<THR?0:s;}
+
+  // h — harmonic invariant: amplitude envelope × fundamental tone
+  // envelope = |pcm| smoothed very heavily (λ=500)
+  const absP=new Float32Array(n); for(let i=0;i<n;i++) absP[i]=Math.abs(pcm[i]);
+  const env=thomasSmooth(absP, 500);
+  // fundamental frequency
+  const f0=dominantFreq(pcm.subarray(0,Math.min(n,sr)), sr||44100);
+  const harm=new Float32Array(n);
+  const twoPiF0=2*Math.PI*f0/(sr||44100);
+  for(let i=0;i<n;i++) harm[i]=Math.sin(twoPiF0*i)*env[i]*0.8;
+
+  return {grad, sol, harm, f0};
 }
 
 // Audio state
@@ -392,8 +423,8 @@ function loadAudioFile(file){
       }
       for(let i=0;i<len;i++) mono[i]/=audioBuf.numberOfChannels;
       // Hodge decomp
-      const d=hodgeDecompose(mono);
-      decomposed={grad:d.grad, sol:d.sol, harm:d.harm, full:mono, sr};
+      const d=hodgeDecompose(mono, sr);
+      decomposed={grad:d.grad, sol:d.sol, harm:d.harm, full:mono, sr, f0:d.f0};
       // start playing full
       playPCM(mono, sr);
       document.getElementById('dropzone').textContent='▶ '+file.name.slice(0,22);
@@ -401,6 +432,9 @@ function loadAudioFile(file){
       document.querySelectorAll('.dbtn').forEach(b=>b.classList.remove('active'));
       document.getElementById('btn-all').classList.add('active');
       modeOverride=null;
+      // show f0 in h button
+      const f0r=Math.round(d.f0);
+      document.getElementById('btn-h').innerHTML=`<span style="color:#a855f7">h</span>  ${f0r}Hz`;
     });
   };
   reader.readAsArrayBuffer(file);
