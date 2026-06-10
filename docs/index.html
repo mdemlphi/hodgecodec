@@ -205,27 +205,19 @@ float getWave(float idx, float t){
 
 float map(vec3 p){
   float t=u_t;
-  float z_s=0.08;
-  float idx=fract(p.z*z_s)*255.0;
-  float wave=getWave(idx,t)*0.45;
+  float wave=getWave(fract(p.z*0.08)*255.0,t)*0.30;
 
-  // ∇φ — cyan — SLOW smooth spiral (tonal, gradient)
-  float a1=p.z*0.55+t*0.75;
-  vec2  p1=vec2(sin(a1)*0.40, cos(a1)*0.40+wave*0.25);
-  float d1=length(p.xy-p1)-(0.026+u_treble*0.012);
+  // Taiji topology: two symmetric arms π apart
+  float a=p.z*1.4+t*0.65;
+  float r=0.37;
+  vec2 p1=vec2( sin(a)*r,  cos(a)*r+wave*0.20); // ∇φ cyan  (yin)
+  vec2 p2=vec2(-sin(a)*r, -cos(a)*r-wave*0.20); // δψ magenta (yang, π shift)
+  float d1=length(p.xy-p1)-(0.040+u_treble*0.015);
+  float d2=length(p.xy-p2)-(0.040+u_bass*0.015);
+  float d3=length(p.xy)-(0.022+u_mid*0.010);    // h spine
 
-  // δψ — magenta — FAST jagged spiral (transient, solenoidal)
-  float a2=p.z*5.0-t*4.0+sin(p.z*1.8+t*1.2)*1.2;
-  vec2  p2=vec2(sin(a2)*0.30+sin(p.z*8.0+t*2.5)*0.07,
-               -cos(a2)*0.30+cos(p.z*6.1-t*1.9)*0.07);
-  float d2=length(p.xy-p2)-(0.016+u_bass*0.010);
-
-  // h — purple — STRAIGHT line on axis (invariant, never rotates)
-  float d3=length(p.xy)-( 0.055+u_mid*0.025 );
-
-  float d_str=min(d1,min(d2,d3));
-  float tunnel=-(length(p.xy)-(0.85+u_bass*0.12));
-  return min(d_str,tunnel);
+  float tunnel=-(length(p.xy)-(0.78+u_bass*0.08));
+  return min(min(d1,min(d2,d3)),tunnel);
 }
 
 vec3 normal(vec3 p){
@@ -286,35 +278,33 @@ void main(){
     float idx=fract(p.z*z_s)*255.0;
     float wave=getWave(idx,t)*0.45;
 
-    float a1=p.z*1.5+t*2.0;
-    vec2  p1=vec2(sin(a1)*0.32,cos(a1)*0.32+wave);
-    float d1=length(p.xy-p1);
+    // Same formulas as map() — correct cord coloring
+    float wc=getWave(fract(p.z*0.08)*255.0,t)*0.30;
+    float ac=p.z*1.4+t*0.65;
+    float rc=0.37;
+    vec2 pc1=vec2( sin(ac)*rc,  cos(ac)*rc+wc*0.20);
+    vec2 pc2=vec2(-sin(ac)*rc, -cos(ac)*rc-wc*0.20);
+    float d1=length(p.xy-pc1);
+    float d2=length(p.xy-pc2);
+    float d3=length(p.xy);
+    float fr=pow(1.0-abs(dot(n,-rd)),3.0);
+    float th=0.055+u_bass*0.018;
 
-    float a2=-p.z*1.2+t*1.5;
-    vec2  p2=vec2(sin(a2)*0.32,-cos(a2)*0.32+wave*0.85);
-    float d2=length(p.xy-p2);
-
-    float a3=p.z*3.5-t*3.0;
-    vec2  p3=vec2(sin(a3)*0.22+wave*0.5,cos(a3)*0.22);
-    float d3=length(p.xy-p3);
-
-    if(d1<0.004){
-      col=cCyan*(ao*0.8+0.2);
-      // Fresnel rim
-      col+=cCyan*pow(1.0-abs(dot(n,-rd)),3.0)*0.8;
-    } else if(d2<0.004){
-      col=cMagenta*(ao*0.8+0.2);
-      col+=cMagenta*pow(1.0-abs(dot(n,-rd)),3.0)*0.8;
-    } else if(d3<0.004){
-      col=cPurple*(ao*0.8+0.2);
-      col+=cPurple*pow(1.0-abs(dot(n,-rd)),3.0)*0.8;
+    if(d1<th){
+      col=cCyan*(ao*0.75+0.25)+cCyan*fr*1.3;
+    } else if(d2<th){
+      col=cMagenta*(ao*0.75+0.25)+cMagenta*fr*1.3;
+    } else if(d3<0.034+u_mid*0.012){
+      col=cPurple*(ao*0.7+0.3)+cPurple*fr*0.9;
     } else {
-      // Tunnel grid
-      float ac=atan(p.y,p.x);
-      float gl2=sin(ac*16.0);
-      float gt=sin(p.z*6.0);
-      float gi=smoothstep(0.93,0.98,gl2*gt);
-      col=mix(cPurple*0.08,cCyan*1.3,gi*(0.4+u_bass*0.6))*ao;
+      // Tunnel wall — yin-yang atmospheric split
+      float tang=atan(p.y,p.x);
+      float side=sin(tang-ac);
+      vec3 atm=mix(cCyan*0.20,cMagenta*0.16,smoothstep(-0.6,0.6,side));
+      float gl2=sin(tang*10.0);
+      float gt=sin(p.z*5.0+t*0.4);
+      float gi=smoothstep(0.88,0.95,gl2*gt);
+      col=atm*(ao*1.1)+mix(cCyan,cMagenta,0.5)*gi*(0.22+u_bass*0.40)*ao;
     }
 
     vec3 ld=normalize(vec3(sin(t),1.0,cos(t)));
