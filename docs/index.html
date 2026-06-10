@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HodgeCodec — W = ∇φ + δψ + h</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'SF Mono','Fira Code',monospace;color:#fff}
+canvas#gl{position:fixed;inset:0;width:100%;height:100%}
+#hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:clamp(1.5rem,4vw,3rem)}
+.top{display:flex;align-items:flex-start;justify-content:space-between}
+h1{font-size:clamp(1.1rem,2.5vw,1.8rem);font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    text-shadow:0 0 30px rgba(0,240,255,.8),0 0 60px rgba(0,240,255,.4)}
+h1 span{color:#ff00a8;text-shadow:0 0 30px rgba(255,0,168,.8)}
+.doi{font-size:.65rem;color:rgba(255,255,255,.35);letter-spacing:.12em;margin-top:.4rem}
+.eq{font-size:clamp(1.8rem,5vw,3.5rem);font-weight:300;letter-spacing:.04em;text-align:center;
+    text-shadow:0 0 40px rgba(255,255,255,.3);line-height:1.3;pointer-events:none}
+.eq .g{color:#00f0ff;text-shadow:0 0 20px #00f0ff,0 0 60px #00f0ff88}
+.eq .s{color:#ff00a8;text-shadow:0 0 20px #ff00a8,0 0 60px #ff00a888}
+.eq .h{color:#a855f7;text-shadow:0 0 20px #a855f7,0 0 60px #a855f788}
+.sub{font-size:clamp(.6rem,.9vw,.8rem);color:rgba(255,255,255,.4);text-align:center;
+     letter-spacing:.08em;margin-top:.8rem}
+.bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}
+.stats{display:flex;gap:clamp(.8rem,2vw,2rem)}
+.stat .v{font-size:clamp(1.1rem,2vw,1.6rem);font-weight:700;color:#00f0ff;
+          text-shadow:0 0 20px #00f0ff}
+.stat .l{font-size:.55rem;color:rgba(255,255,255,.3);letter-spacing:.1em;margin-top:.15rem}
+.links{display:flex;gap:.6rem;flex-wrap:wrap;pointer-events:all}
+a.btn{padding:.5rem 1.1rem;border-radius:3px;text-decoration:none;font:.72rem/1 'SF Mono',monospace;
+      letter-spacing:.06em;transition:all .2s;text-transform:uppercase}
+a.primary{background:rgba(0,240,255,.12);border:1px solid rgba(0,240,255,.4);color:#00f0ff}
+a.ghost{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5)}
+a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
+#hint{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);
+      font-size:.6rem;color:rgba(255,255,255,.2);letter-spacing:.15em;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="hud">
+  <div class="top">
+    <div>
+      <h1>Hodge<span>Codec</span></h1>
+      <div class="doi">DOI 10.5281/zenodo.20618759 · 2026</div>
+    </div>
+    <div></div>
+  </div>
+  <div>
+    <div class="eq">W = <span class="g">∇φ</span> + <span class="s">δψ</span> + <span class="h">h</span></div>
+    <div class="sub">harmonic invariant · h ∈ H¹(M,ℝ) · survives all transforms · 9/9 vs Shazam</div>
+  </div>
+  <div class="bottom">
+    <div class="stats">
+      <div class="stat"><div class="v">≥0.999</div><div class="l">cosine sim</div></div>
+      <div class="stat"><div class="v">9/9</div><div class="l">transforms</div></div>
+      <div class="stat"><div class="v">O(N)</div><div class="l">complexity</div></div>
+    </div>
+    <div class="links">
+      <a class="btn primary" href="https://doi.org/10.5281/zenodo.20618759" target="_blank">Preprint</a>
+      <a class="btn ghost" href="https://github.com/MDEMLphi/hodgecodec" target="_blank">GitHub</a>
+      <a class="btn ghost" href="mailto:mdeml@hodgecodec.com">Contact</a>
+    </div>
+  </div>
+</div>
+<div id="hint">CLICK TO INTERACT · SCROLL TO ZOOM</div>
+
+<script>
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl2', {antialias:false, alpha:false});
+
+const VS = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main(){v_uv=a_pos;gl_Position=vec4(a_pos,0,1);}`;
+
+const FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 fragColor;
+
+uniform float u_t;
+uniform float u_bass;
+uniform float u_mid;
+uniform float u_treble;
+uniform float u_impact;
+uniform float u_spectral;
+uniform vec2  u_res;
+uniform vec2  u_mouse;
+uniform float u_zoom;
+
+#define PI 3.14159265
+
+float hash(float n){return fract(sin(n*127.1)*43758.5453);}
+vec3  hash3(float n){return vec3(hash(n),hash(n+1.7),hash(n+3.3));}
+
+float getWave(float idx, float t){
+  float i=mod(idx,256.0);
+  float a=sin(i*0.09+t*1.8)*0.4+sin(i*0.21+t*0.9)*0.3+sin(i*0.047+t*2.3)*0.3;
+  return a*(0.5+u_bass*0.5);
+}
+
+float map(vec3 p){
+  float t=u_t;
+  float z_s=0.08;
+  float idx=fract(p.z*z_s)*255.0;
+  float wave=getWave(idx,t)*0.45;
+
+  // ∇φ cord — cyan — gradient/tonal
+  float a1=p.z*1.5+t*2.0;
+  vec2  p1=vec2(sin(a1)*0.32, cos(a1)*0.32+wave);
+  float d1=length(p.xy-p1)-(0.022+u_treble*0.015);
+
+  // δψ cord — magenta — solenoidal/transient
+  float a2=-p.z*1.2+t*1.5;
+  vec2  p2=vec2(sin(a2)*0.32,-cos(a2)*0.32+wave*0.85);
+  float d2=length(p.xy-p2)-(0.018+u_bass*0.012);
+
+  // h cord — purple — harmonic invariant
+  float a3=p.z*3.5-t*3.0;
+  vec2  p3=vec2(sin(a3)*0.22+wave*0.5,cos(a3)*0.22);
+  float d3=length(p.xy-p3)-0.009;
+
+  float d_str=min(d1,min(d2,d3));
+  float tunnel=-(length(p.xy)-(0.85+u_bass*0.12));
+  return min(d_str,tunnel);
+}
+
+vec3 normal(vec3 p){
+  float e=0.0015;
+  return normalize(vec3(
+    map(p+vec3(e,0,0))-map(p-vec3(e,0,0)),
+    map(p+vec3(0,e,0))-map(p-vec3(0,e,0)),
+    map(p+vec3(0,0,e))-map(p-vec3(0,0,e))
+  ));
+}
+
+void main(){
+  float asp=u_res.x/u_res.y;
+  vec2 uv=v_uv*vec2(asp,1.0);
+
+  // Mouse parallax
+  vec2 mp=(u_mouse/u_res*2.0-1.0)*vec2(asp,1.0)*0.06;
+
+  float t=u_t;
+  float speed=1.2+u_zoom*0.5;
+  vec3 ro=vec3(mp.x,mp.y,t*speed);
+  vec3 target=ro+vec3(0,0,1);
+  vec3 fwd=normalize(target-ro);
+  vec3 rgt=normalize(cross(vec3(0,1,0),fwd));
+  vec3 up_=cross(fwd,rgt);
+  float fov=1.35-u_zoom*0.25;
+  vec3 rd=normalize(fwd*fov+rgt*uv.x+up_*uv.y);
+
+  float td=0.05;
+  float glow=0.0;
+  bool hit=false;
+  int steps=0;
+  vec3 hp=vec3(0);
+
+  for(int i=0;i<80;i++){
+    vec3 p=ro+rd*td;
+    float d=map(p);
+    if(d<0.001){hit=true;steps=i;hp=p;break;}
+    if(td>16.0)break;
+    td+=d*0.65;
+    float ig=fract(p.z*0.08)*255.0;
+    float wg=abs(getWave(ig,t));
+    glow+=exp(-d*18.0)*(0.012+wg*0.02+u_bass*0.012);
+  }
+
+  vec3 col=vec3(0);
+
+  if(hit){
+    vec3 p=hp;
+    vec3 n=normal(p);
+    float ao=1.0-float(steps)/80.0;
+
+    vec3 cCyan   =vec3(0.0,0.98,1.0);
+    vec3 cMagenta=vec3(1.0,0.0,0.65);
+    vec3 cPurple =vec3(0.5,0.0,1.0);
+
+    float z_s=0.08;
+    float idx=fract(p.z*z_s)*255.0;
+    float wave=getWave(idx,t)*0.45;
+
+    float a1=p.z*1.5+t*2.0;
+    vec2  p1=vec2(sin(a1)*0.32,cos(a1)*0.32+wave);
+    float d1=length(p.xy-p1);
+
+    float a2=-p.z*1.2+t*1.5;
+    vec2  p2=vec2(sin(a2)*0.32,-cos(a2)*0.32+wave*0.85);
+    float d2=length(p.xy-p2);
+
+    float a3=p.z*3.5-t*3.0;
+    vec2  p3=vec2(sin(a3)*0.22+wave*0.5,cos(a3)*0.22);
+    float d3=length(p.xy-p3);
+
+    if(d1<0.004){
+      col=cCyan*(ao*0.8+0.2);
+      // Fresnel rim
+      col+=cCyan*pow(1.0-abs(dot(n,-rd)),3.0)*0.8;
+    } else if(d2<0.004){
+      col=cMagenta*(ao*0.8+0.2);
+      col+=cMagenta*pow(1.0-abs(dot(n,-rd)),3.0)*0.8;
+    } else if(d3<0.004){
+      col=cPurple*(ao*0.8+0.2);
+      col+=cPurple*pow(1.0-abs(dot(n,-rd)),3.0)*0.8;
+    } else {
+      // Tunnel grid
+      float ac=atan(p.y,p.x);
+      float gl2=sin(ac*16.0);
+      float gt=sin(p.z*6.0);
+      float gi=smoothstep(0.93,0.98,gl2*gt);
+      col=mix(cPurple*0.08,cCyan*1.3,gi*(0.4+u_bass*0.6))*ao;
+    }
+
+    vec3 ld=normalize(vec3(sin(t),1.0,cos(t)));
+    vec3 rf=reflect(-ld,n);
+    float spec=pow(max(dot(-rd,rf),0.0),12.0);
+    col+=vec3(1)*spec*0.25*(1.0+u_impact*1.2+u_treble*0.8);
+
+    float pcm=abs(getWave(idx,t));
+    float bloom=exp(-abs(p.y-wave)*6.0)*pcm*(0.05+u_impact*0.15);
+    col+=mix(cCyan,cMagenta,.5)*bloom;
+
+    float fog=exp(-td*0.26);
+    col=mix(vec3(0),col,fog);
+  }
+
+  // Volumetric glow
+  vec3 gc=mix(vec3(0.5,0.0,1.0),vec3(0.0,0.95,1.0),.5+sin(t*.3)*.5);
+  col+=gc*glow*0.85;
+
+  // Vignette
+  col*=1.0-dot(v_uv,v_uv)*0.15;
+
+  // Tonemap
+  col=col/(col+0.5);
+  col=pow(col,vec3(0.454));
+
+  fragColor=vec4(col,1.0);
+}`;
+
+function compileShader(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    console.error(gl.getShaderInfoLog(s));
+  return s;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, compileShader(VS, gl.VERTEX_SHADER));
+gl.attachShader(prog, compileShader(FS, gl.FRAGMENT_SHADER));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const quad = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
+const buf  = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, 'a_pos');
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+const U = {};
+['u_t','u_bass','u_mid','u_treble','u_impact','u_spectral','u_res','u_mouse','u_zoom']
+  .forEach(n => U[n] = gl.getUniformLocation(prog, n));
+
+// Audio
+let actx, analyser, dataArr;
+let bass=0, mid=0, treble=0, impact=0, spectral=0, prevEnergy=0;
+function initAudio(){
+  actx = new (window.AudioContext||window.webkitAudioContext)();
+  analyser = actx.createAnalyser();
+  analyser.fftSize = 512;
+  dataArr = new Uint8Array(analyser.frequencyBinCount);
+
+  // Synthesized Hodge signal — 3 component tones
+  const osc1 = actx.createOscillator(); // ∇φ tonal
+  const osc2 = actx.createOscillator(); // δψ solenoidal
+  const osc3 = actx.createOscillator(); // h harmonic
+  const g1=actx.createGain(), g2=actx.createGain(), g3=actx.createGain();
+
+  osc1.type='sine'; osc1.frequency.value=110;
+  osc2.type='sawtooth'; osc2.frequency.value=220;
+  osc3.type='sine'; osc3.frequency.value=55;
+
+  g1.gain.value=0.25; g2.gain.value=0.15; g3.gain.value=0.10;
+
+  // Slow LFO modulation
+  const lfo=actx.createOscillator();
+  const lfoG=actx.createGain();
+  lfo.frequency.value=0.13; lfo.type='sine'; lfoG.gain.value=40;
+  lfo.connect(lfoG); lfoG.connect(osc1.frequency);
+
+  osc1.connect(g1); osc2.connect(g2); osc3.connect(g3);
+  g1.connect(analyser); g2.connect(analyser); g3.connect(analyser);
+  analyser.connect(actx.destination);
+
+  osc1.start(); osc2.start(); osc3.start(); lfo.start();
+}
+
+let audioStarted = false;
+document.addEventListener('click', ()=>{
+  if(!audioStarted){ initAudio(); audioStarted=true; }
+});
+
+// Mouse
+let mx=0, my=0, zoom=0;
+document.addEventListener('mousemove', e=>{ mx=e.clientX; my=e.clientY; });
+document.addEventListener('wheel', e=>{
+  zoom = Math.max(-1, Math.min(1, zoom + e.deltaY * 0.001));
+}, {passive:true});
+
+// Resize
+function resize(){
+  cv.width=window.innerWidth; cv.height=window.innerHeight;
+  gl.viewport(0,0,cv.width,cv.height);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Render
+let t0 = performance.now();
+function frame(){
+  const t = (performance.now()-t0)*0.001;
+
+  if(analyser){
+    analyser.getByteFrequencyData(dataArr);
+    const n=dataArr.length;
+    const bassEnd=Math.floor(n*0.07), midEnd=Math.floor(n*0.35);
+    let b=0,m=0,tr=0;
+    for(let i=0;i<bassEnd;i++) b+=dataArr[i];
+    for(let i=bassEnd;i<midEnd;i++) m+=dataArr[i];
+    for(let i=midEnd;i<n;i++) tr+=dataArr[i];
+    bass  = b/bassEnd/255;
+    mid   = m/(midEnd-bassEnd)/255;
+    treble= tr/(n-midEnd)/255;
+    const energy=bass+mid+treble;
+    impact=Math.max(0,impact*0.92+(energy-prevEnergy)*2.0);
+    prevEnergy=energy;
+    spectral=treble/(bass+0.01);
+  } else {
+    // Animate without audio
+    bass  = 0.3+Math.sin(t*0.7)*0.15;
+    mid   = 0.25+Math.sin(t*1.1)*0.1;
+    treble= 0.2+Math.sin(t*1.7)*0.08;
+    impact= 0.1+Math.abs(Math.sin(t*2.3))*0.15;
+    spectral=0.5+Math.sin(t*0.3)*0.2;
+  }
+
+  gl.useProgram(prog);
+  gl.uniform1f(U.u_t, t);
+  gl.uniform1f(U.u_bass, bass);
+  gl.uniform1f(U.u_mid, mid);
+  gl.uniform1f(U.u_treble, treble);
+  gl.uniform1f(U.u_impact, impact);
+  gl.uniform1f(U.u_spectral, spectral);
+  gl.uniform2f(U.u_res, cv.width, cv.height);
+  gl.uniform2f(U.u_mouse, mx, my);
+  gl.uniform1f(U.u_zoom, zoom);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>
