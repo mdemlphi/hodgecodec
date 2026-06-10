@@ -39,6 +39,26 @@ h1 span{color:#ff00a8;text-shadow:0 0 30px rgba(255,0,168,.8)}
 .dbtn:hover{border-color:rgba(255,255,255,.3);color:#fff;background:rgba(255,255,255,.08)}
 .dbtn.active{border-color:rgba(0,240,255,.5);color:#fff;background:rgba(0,240,255,.1);
              box-shadow:0 0 12px rgba(0,240,255,.2)}
+/* DAW mixer */
+#mixer{position:fixed;left:clamp(1rem,3vw,2.5rem);top:50%;transform:translateY(-50%);
+       background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.08);border-radius:6px;
+       padding:1rem .8rem;display:flex;flex-direction:column;gap:1.2rem;
+       backdrop-filter:blur(10px);pointer-events:all}
+.fader{display:flex;flex-direction:column;align-items:center;gap:.4rem}
+.fader label{font-size:.6rem;letter-spacing:.1em;font-family:monospace}
+.fader input[type=range]{
+  writing-mode:vertical-lr;direction:rtl;
+  -webkit-appearance:slider-vertical;
+  width:22px;height:90px;cursor:pointer;
+  background:transparent;outline:none}
+.fader input[type=range]::-webkit-slider-runnable-track{
+  width:4px;border-radius:2px;background:rgba(255,255,255,.12)}
+.fader input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;margin-left:-5px}
+.fc input::-webkit-slider-thumb{background:#00f0ff;box-shadow:0 0 8px #00f0ff}
+.fm input::-webkit-slider-thumb{background:#ff00a8;box-shadow:0 0 8px #ff00a8}
+.fh input::-webkit-slider-thumb{background:#a855f7;box-shadow:0 0 8px #a855f7}
+.fader .fval{font-size:.55rem;color:rgba(255,255,255,.35);font-family:monospace}
 #dropzone{position:fixed;left:50%;bottom:clamp(2rem,5vh,3.5rem);transform:translateX(-50%);
           background:rgba(0,0,0,.5);border:1px dashed rgba(0,240,255,.25);border-radius:4px;
           padding:.55rem 1.3rem;font-size:.65rem;color:rgba(0,240,255,.5);letter-spacing:.1em;
@@ -106,6 +126,23 @@ a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
   <div class="brow win"><span class="bt">MP3 64k</span><span class="bh">0.9996</span><span class="bs">0.9193</span></div>
   <div class="brow" style="margin-top:.4rem;border-top:1px solid rgba(0,240,255,.15);padding-top:.4rem">
     <span class="bt">HODGE wins</span><span class="bh">9 / 9</span><span class="bs">0 / 9</span></div>
+</div>
+<div id="mixer">
+  <div class="fader fc">
+    <label style="color:#00f0ff">∇φ</label>
+    <input type="range" min="0" max="100" value="100" id="fGrad" oninput="onFader()">
+    <div class="fval" id="vGrad">100</div>
+  </div>
+  <div class="fader fm">
+    <label style="color:#ff00a8">δψ</label>
+    <input type="range" min="0" max="100" value="100" id="fSol" oninput="onFader()">
+    <div class="fval" id="vSol">100</div>
+  </div>
+  <div class="fader fh">
+    <label style="color:#a855f7">h</label>
+    <input type="range" min="0" max="100" value="50" id="fHarm" oninput="onFader()">
+    <div class="fval" id="vHarm">50</div>
+  </div>
 </div>
 <label id="dropzone">
   ▶ DROP AUDIO OR CLICK
@@ -389,6 +426,28 @@ function hodgeDecompose(pcm, sr){
 }
 
 // Audio state
+let gainGrad=1, gainSol=1, gainHarm=0.5;
+let mixNode=null;
+
+function onFader(){
+  gainGrad=document.getElementById('fGrad').value/100;
+  gainSol =document.getElementById('fSol').value/100;
+  gainHarm=document.getElementById('fHarm').value/100;
+  document.getElementById('vGrad').textContent=document.getElementById('fGrad').value;
+  document.getElementById('vSol').textContent =document.getElementById('fSol').value;
+  document.getElementById('vHarm').textContent=document.getElementById('fHarm').value;
+  rebuildMix();
+}
+
+function rebuildMix(){
+  if(!decomposed) return;
+  const n=decomposed.full.length;
+  const mix=new Float32Array(n);
+  for(let i=0;i<n;i++)
+    mix[i]=decomposed.grad[i]*gainGrad + decomposed.sol[i]*gainSol + decomposed.harm[i]*gainHarm;
+  playPCM(mix, decomposed.sr);
+}
+
 let actx, analyser, dataArr;
 let bass=0, mid=0, treble=0, impact=0, spectral=0, prevEnergy=0;
 let modeOverride=null;
