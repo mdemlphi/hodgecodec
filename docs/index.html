@@ -32,6 +32,13 @@ h1 span{color:#ff00a8;text-shadow:0 0 30px rgba(255,0,168,.8)}
 #bench .bt{color:rgba(255,255,255,.5)}
 #bench .bh{color:#00f0ff;font-weight:700}
 #bench .bs{color:rgba(255,255,255,.3)}
+#decomp-btns{display:flex;gap:.5rem;justify-content:center;margin-top:1.2rem;pointer-events:all}
+.dbtn{background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);
+      font-family:'SF Mono','Fira Code',monospace;font-size:.72rem;letter-spacing:.1em;
+      padding:.45rem 1rem;border-radius:3px;cursor:pointer;transition:all .18s;backdrop-filter:blur(6px)}
+.dbtn:hover{border-color:rgba(255,255,255,.3);color:#fff;background:rgba(255,255,255,.08)}
+.dbtn.active{border-color:rgba(0,240,255,.5);color:#fff;background:rgba(0,240,255,.1);
+             box-shadow:0 0 12px rgba(0,240,255,.2)}
 #dropzone{position:fixed;left:50%;bottom:clamp(2rem,5vh,3.5rem);transform:translateX(-50%);
           background:rgba(0,0,0,.5);border:1px dashed rgba(0,240,255,.25);border-radius:4px;
           padding:.55rem 1.3rem;font-size:.65rem;color:rgba(0,240,255,.5);letter-spacing:.1em;
@@ -66,6 +73,12 @@ a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
   <div>
     <div class="eq">W = <span class="g">∇φ</span> + <span class="s">δψ</span> + <span class="h">h</span></div>
     <div class="sub">harmonic invariant · h ∈ H¹(M,ℝ) · survives all transforms · 9/9 vs Shazam</div>
+    <div id="decomp-btns">
+      <button class="dbtn" id="btn-all"  onclick="setMode('all')">W  full</button>
+      <button class="dbtn" id="btn-grad" onclick="setMode('grad')"><span style="color:#00f0ff">∇φ</span>  tonal</button>
+      <button class="dbtn" id="btn-sol"  onclick="setMode('sol')"><span style="color:#ff00a8">δψ</span>  transient</button>
+      <button class="dbtn active" id="btn-h" onclick="setMode('h')"><span style="color:#a855f7">h</span>  harmonic</button>
+    </div>
   </div>
   <div class="bottom">
     <div class="stats">
@@ -307,6 +320,37 @@ const U = {};
 // Audio
 let actx, analyser, dataArr;
 let bass=0, mid=0, treble=0, impact=0, spectral=0, prevEnergy=0;
+let modeOverride = null;
+
+function setMode(m){
+  modeOverride = m === 'all' ? null : m;
+  document.querySelectorAll('.dbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  // Play component tone
+  const ctx = actx || (actx = new(window.AudioContext||window.webkitAudioContext)());
+  if(!analyser){ analyser=ctx.createAnalyser(); analyser.fftSize=512; dataArr=new Uint8Array(analyser.frequencyBinCount); analyser.connect(ctx.destination); }
+  const g=ctx.createGain(); g.connect(analyser);
+  g.gain.setValueAtTime(0,ctx.currentTime);
+  g.gain.linearRampToValueAtTime(0.18,ctx.currentTime+0.04);
+  g.gain.linearRampToValueAtTime(0,ctx.currentTime+0.7);
+  if(m==='grad'){
+    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=220;
+    const o2=ctx.createOscillator(); o2.type='sine'; o2.frequency.value=440;
+    const g2=ctx.createGain(); g2.gain.value=0.5;
+    o.connect(g); o2.connect(g2); g2.connect(g);
+    o.start(); o2.start(); o.stop(ctx.currentTime+0.7); o2.stop(ctx.currentTime+0.7);
+  } else if(m==='sol'){
+    const buf=ctx.createBuffer(1,ctx.sampleRate*.12,ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*.15));
+    const s=ctx.createBufferSource(); s.buffer=buf;
+    const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=2200; f.Q.value=1;
+    s.connect(f); f.connect(g); s.start();
+  } else if(m==='h'){
+    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=55;
+    o.connect(g); o.start(); o.stop(ctx.currentTime+0.9);
+  }
+}
 
 // File drop / file input
 function loadAudioFile(file){
@@ -381,9 +425,14 @@ function frame(){
 
   gl.useProgram(prog);
   gl.uniform1f(U.u_t, t);
-  gl.uniform1f(U.u_bass, bass);
-  gl.uniform1f(U.u_mid, mid);
-  gl.uniform1f(U.u_treble, treble);
+  // Component isolation
+  let rb=bass, rm=mid, rt=treble;
+  if(modeOverride==='grad')  { rb=0.8; rm=0.1; rt=0.0; }
+  else if(modeOverride==='sol') { rb=0.0; rm=0.1; rt=0.9; }
+  else if(modeOverride==='h')   { rb=0.3; rm=0.3; rt=0.3; }
+  gl.uniform1f(U.u_bass, rb);
+  gl.uniform1f(U.u_mid, rm);
+  gl.uniform1f(U.u_treble, rt);
   gl.uniform1f(U.u_impact, impact);
   gl.uniform1f(U.u_spectral, spectral);
   gl.uniform2f(U.u_res, cv.width, cv.height);
