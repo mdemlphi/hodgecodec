@@ -79,6 +79,18 @@ a.ghost{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);
 a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
 #hint{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);
       font-size:.6rem;color:rgba(255,255,255,.2);letter-spacing:.15em;pointer-events:none}
+#scrubber{position:fixed;bottom:3.8rem;left:50%;transform:translateX(-50%);
+  display:none;align-items:center;gap:.7rem;pointer-events:all;
+  background:rgba(4,4,12,.72);border:1px solid rgba(0,240,255,.15);
+  border-radius:4px;padding:.45rem 1rem;backdrop-filter:blur(12px);z-index:10}
+#scr-cur,#scr-dur{font-size:.58rem;color:rgba(255,255,255,.45);
+  font-family:monospace;min-width:2.4rem;text-align:center}
+#scr-bar{width:clamp(140px,22vw,280px);height:3px;cursor:pointer;
+  -webkit-appearance:none;background:rgba(255,255,255,.15);border-radius:2px;outline:none}
+#scr-bar::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
+  border-radius:50%;background:#00f0ff;box-shadow:0 0 8px #00f0ff;cursor:pointer}
+#scr-bar::-webkit-slider-runnable-track{height:3px;border-radius:2px;
+  background:linear-gradient(to right,rgba(0,240,255,.6) var(--pct,0%),rgba(255,255,255,.15) var(--pct,0%))}
 </style>
 </head>
 <body>
@@ -149,6 +161,11 @@ a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
   ▶ DROP AUDIO OR CLICK
   <input type="file" accept="audio/*" id="audioFile">
 </label>
+<div id="scrubber">
+  <span id="scr-cur">0:00</span>
+  <input type="range" id="scr-bar" min="0" max="1000" value="0" step="1">
+  <span id="scr-dur">0:00</span>
+</div>
 <div id="hint">CLICK TO INTERACT · SCROLL TO ZOOM</div>
 
 <script>
@@ -453,6 +470,13 @@ let bass=0, mid=0, treble=0, impact=0, spectral=0, prevEnergy=0;
 let modeOverride=null;
 let decomposed=null;   // {grad, sol, harm, sr}
 let playingSrc=null;
+let playStartCtxTime=0, playStartOffset=0, playDuration=0;
+let isSeeking=false;
+
+function fmtTime(s){
+  const m=Math.floor(s/60), ss=Math.floor(s%60).toString().padStart(2,'0');
+  return `${m}:${ss}`;
+}
 
 function ensureCtx(){
   if(!actx) actx=new(window.AudioContext||window.webkitAudioContext)();
@@ -463,16 +487,47 @@ function ensureCtx(){
   }
 }
 
-function playPCM(pcm, sr){
+function playPCM(pcm, sr, offset){
   if(playingSrc){ try{playingSrc.stop();}catch(e){} playingSrc=null; }
   ensureCtx();
-  const buf=actx.createBuffer(1,pcm.length,sr||actx.sampleRate);
-  buf.copyToChannel(pcm,0);
+  const abuf=actx.createBuffer(1,pcm.length,sr||actx.sampleRate);
+  abuf.copyToChannel(pcm,0);
   const src=actx.createBufferSource();
-  src.buffer=buf; src.loop=true;
-  src.connect(analyser); src.start();
+  src.buffer=abuf; src.loop=true;
+  const off=offset||0;
+  src.connect(analyser); src.start(0, off);
   playingSrc=src;
+  playStartCtxTime=actx.currentTime;
+  playStartOffset=off;
+  playDuration=pcm.length/(sr||44100);
+  // update scrubber duration label
+  document.getElementById('scr-dur').textContent=fmtTime(playDuration);
 }
+
+// Scrubber events
+const scrBar=document.getElementById('scr-bar');
+scrBar.addEventListener('mousedown',()=>{ isSeeking=true; });
+scrBar.addEventListener('touchstart',()=>{ isSeeking=true; },{passive:true});
+scrBar.addEventListener('input',()=>{
+  if(!playDuration) return;
+  const pos=scrBar.value/1000*playDuration;
+  document.getElementById('scr-cur').textContent=fmtTime(pos);
+  // update track fill
+  scrBar.style.setProperty('--pct',(scrBar.value/10)+'%');
+});
+function scrubCommit(){
+  isSeeking=false;
+  if(!decomposed||!playDuration) return;
+  const offset=scrBar.value/1000*playDuration;
+  let pcm;
+  if(!modeOverride||modeOverride==='all') pcm=decomposed.full;
+  else if(modeOverride==='grad') pcm=decomposed.grad;
+  else if(modeOverride==='sol')  pcm=decomposed.sol;
+  else pcm=decomposed.harm;
+  playPCM(pcm, decomposed.sr, offset);
+}
+scrBar.addEventListener('mouseup', scrubCommit);
+scrBar.addEventListener('touchend', scrubCommit);
 
 function setMode(m){
   modeOverride=(m==='all')?null:m;
@@ -506,6 +561,7 @@ function loadAudioFile(file){
       // start playing full
       playPCM(mono, sr);
       document.getElementById('dropzone').textContent='▶ '+file.name.slice(0,22);
+      document.getElementById('scrubber').style.display='flex';
       // activate W button
       document.querySelectorAll('.dbtn').forEach(b=>b.classList.remove('active'));
       document.getElementById('btn-all').classList.add('active');
@@ -586,6 +642,16 @@ function frame(){
   gl.uniform1f(U.u_zoom, zoom);
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  // Sync scrubber position
+  if(playDuration>0 && !isSeeking && actx){
+    const pos=((actx.currentTime-playStartCtxTime+playStartOffset)%playDuration+playDuration)%playDuration;
+    const pct=pos/playDuration;
+    scrBar.value=pct*1000;
+    scrBar.style.setProperty('--pct',(pct*100)+'%');
+    document.getElementById('scr-cur').textContent=fmtTime(pos);
+  }
+
   requestAnimationFrame(frame);
 }
 frame();
