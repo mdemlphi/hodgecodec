@@ -40,10 +40,11 @@ h1 span{color:#ff00a8;text-shadow:0 0 30px rgba(255,0,168,.8)}
 .dbtn.active{border-color:rgba(0,240,255,.5);color:#fff;background:rgba(0,240,255,.1);
              box-shadow:0 0 12px rgba(0,240,255,.2)}
 /* DAW mixer */
-#mixer{position:fixed;left:clamp(1rem,3vw,2.5rem);top:50%;transform:translateY(-50%);
-       background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.08);border-radius:6px;
-       padding:1rem .8rem;display:flex;flex-direction:column;gap:1.2rem;
-       backdrop-filter:blur(10px);pointer-events:all}
+#mixer{position:fixed;left:clamp(1rem,3vw,2rem);top:50%;transform:translateY(-50%);
+       background:rgba(4,4,12,.75);border:1px solid rgba(255,255,255,.12);border-radius:8px;
+       padding:1rem .9rem;display:flex;flex-direction:column;gap:1.4rem;
+       backdrop-filter:blur(14px);pointer-events:all;z-index:10;
+       box-shadow:0 0 30px rgba(0,0,0,.5)}
 .fader{display:flex;flex-direction:column;align-items:center;gap:.4rem}
 .fader label{font-size:.6rem;letter-spacing:.1em;font-family:monospace}
 .fader input[type=range]{
@@ -191,20 +192,19 @@ float map(vec3 p){
   float idx=fract(p.z*z_s)*255.0;
   float wave=getWave(idx,t)*0.45;
 
-  // ∇φ cord — cyan — gradient/tonal
-  float a1=p.z*1.5+t*2.0;
-  vec2  p1=vec2(sin(a1)*0.32, cos(a1)*0.32+wave);
-  float d1=length(p.xy-p1)-(0.022+u_treble*0.015);
+  // ∇φ — cyan — SLOW smooth spiral (tonal, gradient)
+  float a1=p.z*0.55+t*0.75;
+  vec2  p1=vec2(sin(a1)*0.40, cos(a1)*0.40+wave*0.25);
+  float d1=length(p.xy-p1)-(0.026+u_treble*0.012);
 
-  // δψ cord — magenta — solenoidal/transient
-  float a2=-p.z*1.2+t*1.5;
-  vec2  p2=vec2(sin(a2)*0.32,-cos(a2)*0.32+wave*0.85);
-  float d2=length(p.xy-p2)-(0.018+u_bass*0.012);
+  // δψ — magenta — FAST jagged spiral (transient, solenoidal)
+  float a2=p.z*5.0-t*4.0+sin(p.z*1.8+t*1.2)*1.2;
+  vec2  p2=vec2(sin(a2)*0.30+sin(p.z*8.0+t*2.5)*0.07,
+               -cos(a2)*0.30+cos(p.z*6.1-t*1.9)*0.07);
+  float d2=length(p.xy-p2)-(0.016+u_bass*0.010);
 
-  // h cord — purple — harmonic invariant
-  float a3=p.z*3.5-t*3.0;
-  vec2  p3=vec2(sin(a3)*0.22+wave*0.5,cos(a3)*0.22);
-  float d3=length(p.xy-p3)-0.009;
+  // h — purple — STRAIGHT line on axis (invariant, never rotates)
+  float d3=length(p.xy)-( 0.055+u_mid*0.025 );
 
   float d_str=min(d1,min(d2,d3));
   float tunnel=-(length(p.xy)-(0.85+u_bass*0.12));
