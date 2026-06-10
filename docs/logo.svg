@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0d0d18"/>
+      <stop offset="100%" stop-color="#060608"/>
+    </radialGradient>
+    <filter id="glow-c"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-m"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-p"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="400" fill="url(#bg)" rx="32"/>
+
+  <!-- Three helix spirals — Hodge components -->
+  <!-- ∇φ — cyan — gradient/tonal helix -->
+  <path d="M 200 80
+    C 240 95, 255 115, 240 140
+    C 225 165, 200 170, 185 155
+    C 170 140, 168 120, 180 105
+    C 192 90, 215 88, 228 100
+    C 241 112, 245 135, 235 155
+    C 225 175, 205 182, 190 172
+    C 175 162, 168 143, 172 125
+    C 176 107, 193 97, 208 100
+    C 223 103, 233 118, 232 135
+    C 231 152, 218 163, 204 162
+    C 190 161, 180 150, 179 136
+    C 178 122, 187 111, 200 110
+    C 213 109, 221 120, 220 133
+    C 219 146, 209 154, 197 152"
+    fill="none" stroke="#00f0ff" stroke-width="2.5" stroke-linecap="round" opacity="0.9" filter="url(#glow-c)"/>
+
+  <!-- δψ — magenta — solenoidal/attack -->
+  <path d="M 200 130
+    C 240 130, 260 150, 255 175
+    C 250 200, 228 210, 208 202
+    C 188 194, 178 175, 183 155
+    C 188 135, 208 127, 225 133
+    C 242 139, 250 158, 246 177
+    C 242 196, 226 205, 209 200
+    C 192 195, 183 180, 185 163
+    C 187 146, 200 137, 215 140
+    C 230 143, 238 157, 235 171
+    C 232 185, 220 193, 207 190
+    C 194 187, 186 176, 188 163"
+    fill="none" stroke="#ff00a8" stroke-width="2.5" stroke-linecap="round" opacity="0.9" filter="url(#glow-m)"/>
+
+  <!-- h — purple — harmonic invariant (stable circle) -->
+  <circle cx="200" cy="200" r="52" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.5" filter="url(#glow-p)"/>
+  <circle cx="200" cy="200" r="38" fill="none" stroke="#a855f7" stroke-width="1.5" opacity="0.35" filter="url(#glow-p)"/>
+  <circle cx="200" cy="200" r="66" fill="none" stroke="#a855f7" stroke-width="1" opacity="0.2" filter="url(#glow-p)"/>
+
+  <!-- Center dot — h invariant core -->
+  <circle cx="200" cy="200" r="5" fill="#a855f7" opacity="0.9" filter="url(#glow-p)"/>
+  <circle cx="200" cy="200" r="2.5" fill="#fff" opacity="0.8"/>
+
+  <!-- Formula W = ∇φ + δψ + h -->
+  <text x="200" y="302" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="15" fill="rgba(255,255,255,0.35)" letter-spacing="1">W =</text>
+  <text x="230" y="302" text-anchor="start" font-family="'SF Mono', 'Fira Code', monospace" font-size="15" fill="#00f0ff" opacity="0.9" filter="url(#glow-c)">∇φ</text>
+  <text x="256" y="302" text-anchor="start" font-family="'SF Mono', 'Fira Code', monospace" font-size="15" fill="rgba(255,255,255,0.35)"> + </text>
+  <text x="274" y="302" text-anchor="start" font-family="'SF Mono', 'Fira Code', monospace" font-size="15" fill="#ff00a8" opacity="0.9" filter="url(#glow-m)">δψ</text>
+  <text x="298" y="302" text-anchor="start" font-family="'SF Mono', 'Fira Code', monospace" font-size="15" fill="rgba(255,255,255,0.35)"> + </text>
+  <text x="316" y="302" text-anchor="start" font-family="'SF Mono', 'Fira Code', monospace" font-size="15" fill="#a855f7" opacity="0.9" filter="url(#glow-p)">h</text>
+
+  <!-- Wordmark -->
+  <text x="200" y="342" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="22" font-weight="700" fill="#ffffff" letter-spacing="2" opacity="0.9">HODGE<tspan fill="#00f0ff">CODEC</tspan></text>
+
+  <!-- DOI tag -->
+  <text x="200" y="368" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="9" fill="rgba(255,255,255,0.2)" letter-spacing="1">DOI 10.5281/zenodo.20618759</text>
+</svg>

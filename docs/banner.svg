@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0d0d20"/>
+      <stop offset="100%" stop-color="#060608"/>
+    </radialGradient>
+    <filter id="gc"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="gm"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="gp"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="gw"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- Subtle grid -->
+  <line x1="0" y1="320" x2="1280" y2="320" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+
+  <!-- LEFT — Three Hodge orbits, topological invariant visualization -->
+  <!-- h harmonic — stable concentric rings (purple) — THE INVARIANT -->
+  <circle cx="340" cy="320" r="210" fill="none" stroke="#a855f7" stroke-width="0.8" opacity="0.12" filter="url(#gp)"/>
+  <circle cx="340" cy="320" r="160" fill="none" stroke="#a855f7" stroke-width="1" opacity="0.2" filter="url(#gp)"/>
+  <circle cx="340" cy="320" r="110" fill="none" stroke="#a855f7" stroke-width="1.5" opacity="0.35" filter="url(#gp)"/>
+  <circle cx="340" cy="320" r="62" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.55" filter="url(#gp)"/>
+
+  <!-- ∇φ — cyan helix (gradient/tonal component) -->
+  <path d="M340 110 C425 120 468 178 456 244 C444 310 396 342 342 330
+           C288 318 256 272 264 218 C272 164 318 137 362 145
+           C406 153 432 193 427 236 C422 279 389 302 350 296
+           C311 290 287 261 291 224 C295 187 325 167 357 173
+           C389 179 408 207 404 238 C400 269 375 286 346 281"
+    fill="none" stroke="#00f0ff" stroke-width="2.8" stroke-linecap="round" opacity="0.9" filter="url(#gc)"/>
+
+  <!-- δψ — magenta helix (solenoidal/transient, opposite handedness) -->
+  <path d="M340 530 C255 520 212 462 224 396 C236 330 284 298 338 310
+           C392 322 424 368 416 422 C408 476 364 502 320 494
+           C276 486 250 450 254 410 C258 370 288 349 326 355
+           C364 361 388 393 383 430 C378 467 350 484 317 478
+           C284 472 263 446 265 414 C267 382 293 366 322 370
+           C351 374 370 398 366 426"
+    fill="none" stroke="#ff00a8" stroke-width="2.8" stroke-linecap="round" opacity="0.9" filter="url(#gm)"/>
+
+  <!-- Center — invariant node -->
+  <circle cx="340" cy="320" r="12" fill="#a855f7" opacity="0.7" filter="url(#gp)"/>
+  <circle cx="340" cy="320" r="5" fill="#ffffff" opacity="0.95"/>
+
+  <!-- Component labels -->
+  <text x="340" y="97" text-anchor="middle" font-family="monospace" font-size="12" fill="#00f0ff" opacity="0.7" filter="url(#gc)">∇φ  tonal</text>
+  <text x="340" y="546" text-anchor="middle" font-family="monospace" font-size="12" fill="#ff00a8" opacity="0.7" filter="url(#gm)">δψ  transient</text>
+  <text x="462" y="324" font-family="monospace" font-size="12" fill="#a855f7" opacity="0.7" filter="url(#gp)">h ∈ H¹(M,ℝ)</text>
+
+  <!-- RIGHT — wordmark + data -->
+  <text x="710" y="205" font-family="'SF Mono',monospace" font-size="76" font-weight="700" fill="#ffffff" letter-spacing="-2" opacity="0.97">Hodge</text>
+  <text x="710" y="285" font-family="'SF Mono',monospace" font-size="76" font-weight="700" fill="#00f0ff" letter-spacing="-2" opacity="0.97" filter="url(#gc)">Codec</text>
+
+  <!-- Formula -->
+  <g transform="translate(710,330)">
+    <text font-family="monospace" font-size="28" fill="rgba(255,255,255,0.4)">W = </text>
+    <text x="78" font-family="monospace" font-size="28" fill="#00f0ff" filter="url(#gc)">∇φ</text>
+    <text x="122" font-family="monospace" font-size="28" fill="rgba(255,255,255,0.35)"> + </text>
+    <text x="155" font-family="monospace" font-size="28" fill="#ff00a8" filter="url(#gm)">δψ</text>
+    <text x="199" font-family="monospace" font-size="28" fill="rgba(255,255,255,0.35)"> + </text>
+    <text x="232" font-family="monospace" font-size="28" fill="#a855f7" filter="url(#gp)">h</text>
+  </g>
+
+  <!-- Tagline -->
+  <text x="710" y="385" font-family="monospace" font-size="14" fill="rgba(255,255,255,0.35)" letter-spacing="1.5">First fingerprint grounded in de Rham cohomology</text>
+
+  <!-- Divider -->
+  <line x1="710" y1="410" x2="1230" y2="410" stroke="rgba(0,240,255,0.12)" stroke-width="1"/>
+
+  <!-- Stats -->
+  <g transform="translate(710,450)">
+    <text font-family="monospace" font-size="32" font-weight="700" fill="#00f0ff" filter="url(#gc)">9/9</text>
+    <text y="22" font-family="monospace" font-size="10" fill="rgba(255,255,255,0.28)" letter-spacing="2">VS SHAZAM</text>
+  </g>
+  <g transform="translate(830,450)">
+    <text font-family="monospace" font-size="32" font-weight="700" fill="#00f0ff" filter="url(#gc)">≥0.999</text>
+    <text y="22" font-family="monospace" font-size="10" fill="rgba(255,255,255,0.28)" letter-spacing="2">COSINE SIM</text>
+  </g>
+  <g transform="translate(1020,450)">
+    <text font-family="monospace" font-size="32" font-weight="700" fill="#00f0ff" filter="url(#gc)">O(N)</text>
+    <text y="22" font-family="monospace" font-size="10" fill="rgba(255,255,255,0.28)" letter-spacing="2">COMPLEXITY</text>
+  </g>
+
+  <!-- Bottom -->
+  <text x="710" y="555" font-family="monospace" font-size="11" fill="rgba(255,255,255,0.18)" letter-spacing="1">DOI 10.5281/zenodo.20618759  ·  crates.io/crates/hodgecodec  ·  hodgecodec.com</text>
+  <text x="710" y="576" font-family="monospace" font-size="10" fill="rgba(255,255,255,0.12)" letter-spacing="1">Maksym Dyachenko · MIT · 2026</text>
+</svg>
