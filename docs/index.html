@@ -307,41 +307,6 @@ const U = {};
 // Audio
 let actx, analyser, dataArr;
 let bass=0, mid=0, treble=0, impact=0, spectral=0, prevEnergy=0;
-function initAudio(){
-  actx = new (window.AudioContext||window.webkitAudioContext)();
-  analyser = actx.createAnalyser();
-  analyser.fftSize = 512;
-  dataArr = new Uint8Array(analyser.frequencyBinCount);
-
-  // Synthesized Hodge signal — 3 component tones
-  const osc1 = actx.createOscillator(); // ∇φ tonal
-  const osc2 = actx.createOscillator(); // δψ solenoidal
-  const osc3 = actx.createOscillator(); // h harmonic
-  const g1=actx.createGain(), g2=actx.createGain(), g3=actx.createGain();
-
-  osc1.type='sine'; osc1.frequency.value=110;
-  osc2.type='sawtooth'; osc2.frequency.value=220;
-  osc3.type='sine'; osc3.frequency.value=55;
-
-  g1.gain.value=0.25; g2.gain.value=0.15; g3.gain.value=0.10;
-
-  // Slow LFO modulation
-  const lfo=actx.createOscillator();
-  const lfoG=actx.createGain();
-  lfo.frequency.value=0.13; lfo.type='sine'; lfoG.gain.value=40;
-  lfo.connect(lfoG); lfoG.connect(osc1.frequency);
-
-  osc1.connect(g1); osc2.connect(g2); osc3.connect(g3);
-  g1.connect(analyser); g2.connect(analyser); g3.connect(analyser);
-  analyser.connect(actx.destination);
-
-  osc1.start(); osc2.start(); osc3.start(); lfo.start();
-}
-
-let audioStarted = false;
-document.addEventListener('click', ()=>{
-  if(!audioStarted){ initAudio(); audioStarted=true; }
-});
 
 // File drop / file input
 function loadAudioFile(file){
