@@ -317,56 +317,90 @@ const U = {};
 ['u_t','u_bass','u_mid','u_treble','u_impact','u_spectral','u_res','u_mouse','u_zoom']
   .forEach(n => U[n] = gl.getUniformLocation(prog, n));
 
-// Audio
-let actx, analyser, dataArr;
-let bass=0, mid=0, treble=0, impact=0, spectral=0, prevEnergy=0;
-let modeOverride = null;
-
-function setMode(m){
-  modeOverride = m === 'all' ? null : m;
-  document.querySelectorAll('.dbtn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('btn-'+m).classList.add('active');
-  // Play component tone
-  const ctx = actx || (actx = new(window.AudioContext||window.webkitAudioContext)());
-  if(!analyser){ analyser=ctx.createAnalyser(); analyser.fftSize=512; dataArr=new Uint8Array(analyser.frequencyBinCount); analyser.connect(ctx.destination); }
-  const g=ctx.createGain(); g.connect(analyser);
-  g.gain.setValueAtTime(0,ctx.currentTime);
-  g.gain.linearRampToValueAtTime(0.18,ctx.currentTime+0.04);
-  g.gain.linearRampToValueAtTime(0,ctx.currentTime+0.7);
-  if(m==='grad'){
-    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=220;
-    const o2=ctx.createOscillator(); o2.type='sine'; o2.frequency.value=440;
-    const g2=ctx.createGain(); g2.gain.value=0.5;
-    o.connect(g); o2.connect(g2); g2.connect(g);
-    o.start(); o2.start(); o.stop(ctx.currentTime+0.7); o2.stop(ctx.currentTime+0.7);
-  } else if(m==='sol'){
-    const buf=ctx.createBuffer(1,ctx.sampleRate*.12,ctx.sampleRate);
-    const d=buf.getChannelData(0);
-    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*.15));
-    const s=ctx.createBufferSource(); s.buffer=buf;
-    const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=2200; f.Q.value=1;
-    s.connect(f); f.connect(g); s.start();
-  } else if(m==='h'){
-    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=55;
-    o.connect(g); o.start(); o.stop(ctx.currentTime+0.9);
-  }
+// ── Hodge decomposition in JS (Thomas O(N) solver, same as Rust) ────────────
+function hodgeDecompose(pcm){
+  const n=pcm.length;
+  const h=pcm.reduce((a,b)=>a+b,0)/n;           // harmonic = mean
+  const c=pcm.map(x=>x-h);                        // centered
+  // Thomas smooth (λ=3, Neumann BC)
+  const lam=3, a=-lam, b0=1+lam, bm=1+2*lam;
+  const cp=new Float32Array(n), dp=new Float32Array(n);
+  cp[0]=a/b0; dp[0]=c[0]/b0;
+  for(let i=1;i<n-1;i++){const D=bm-a*cp[i-1];cp[i]=a/D;dp[i]=(c[i]-a*dp[i-1])/D;}
+  const Dn=b0-a*cp[n-2]; dp[n-1]=(c[n-1]-a*dp[n-2])/Dn;
+  const grad=new Float32Array(n);
+  grad[n-1]=dp[n-1];
+  for(let i=n-2;i>=0;i--) grad[i]=dp[i]-cp[i]*grad[i+1];
+  const sol=new Float32Array(n);
+  const THR=1e-3;
+  for(let i=0;i<n;i++){let s=c[i]-grad[i]; sol[i]=Math.abs(s)<THR?0:s;}
+  const hArr=new Float32Array(n).fill(h);
+  return {grad, sol, harm:hArr, h};
 }
 
-// File drop / file input
-function loadAudioFile(file){
-  if(!actx){ actx=new(window.AudioContext||window.webkitAudioContext)(); audioStarted=true; }
+// Audio state
+let actx, analyser, dataArr;
+let bass=0, mid=0, treble=0, impact=0, spectral=0, prevEnergy=0;
+let modeOverride=null;
+let decomposed=null;   // {grad, sol, harm, sr}
+let playingSrc=null;
+
+function ensureCtx(){
+  if(!actx) actx=new(window.AudioContext||window.webkitAudioContext)();
   if(!analyser){
     analyser=actx.createAnalyser(); analyser.fftSize=512;
     dataArr=new Uint8Array(analyser.frequencyBinCount);
     analyser.connect(actx.destination);
   }
+}
+
+function playPCM(pcm, sr){
+  if(playingSrc){ try{playingSrc.stop();}catch(e){} playingSrc=null; }
+  ensureCtx();
+  const buf=actx.createBuffer(1,pcm.length,sr||actx.sampleRate);
+  buf.copyToChannel(pcm,0);
+  const src=actx.createBufferSource();
+  src.buffer=buf; src.loop=true;
+  src.connect(analyser); src.start();
+  playingSrc=src;
+}
+
+function setMode(m){
+  modeOverride=(m==='all')?null:m;
+  document.querySelectorAll('.dbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  if(!decomposed) return;
+  if(m==='all')  playPCM(decomposed.full, decomposed.sr);
+  else if(m==='grad') playPCM(decomposed.grad, decomposed.sr);
+  else if(m==='sol')  playPCM(decomposed.sol,  decomposed.sr);
+  else if(m==='h')    playPCM(decomposed.harm, decomposed.sr);
+}
+
+// File drop / file input
+function loadAudioFile(file){
+  ensureCtx();
   const reader=new FileReader();
   reader.onload=e=>{
-    actx.decodeAudioData(e.target.result, buf=>{
-      const src=actx.createBufferSource();
-      src.buffer=buf; src.loop=true;
-      src.connect(analyser); src.start();
-      document.getElementById('dropzone').textContent='▶ '+file.name.slice(0,24);
+    actx.decodeAudioData(e.target.result, audioBuf=>{
+      // mix to mono
+      const sr=audioBuf.sampleRate;
+      const len=audioBuf.length;
+      const mono=new Float32Array(len);
+      for(let ch=0;ch<audioBuf.numberOfChannels;ch++){
+        const chData=audioBuf.getChannelData(ch);
+        for(let i=0;i<len;i++) mono[i]+=chData[i];
+      }
+      for(let i=0;i<len;i++) mono[i]/=audioBuf.numberOfChannels;
+      // Hodge decomp
+      const d=hodgeDecompose(mono);
+      decomposed={grad:d.grad, sol:d.sol, harm:d.harm, full:mono, sr};
+      // start playing full
+      playPCM(mono, sr);
+      document.getElementById('dropzone').textContent='▶ '+file.name.slice(0,22);
+      // activate W button
+      document.querySelectorAll('.dbtn').forEach(b=>b.classList.remove('active'));
+      document.getElementById('btn-all').classList.add('active');
+      modeOverride=null;
     });
   };
   reader.readAsArrayBuffer(file);
