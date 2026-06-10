@@ -345,28 +345,47 @@ function dominantFreq(pcm, sr){
 
 function hodgeDecompose(pcm, sr){
   const n=pcm.length;
+  const SR=sr||44100;
   const mean=pcm.reduce((a,b)=>a+b,0)/n;
   const c=new Float32Array(n); for(let i=0;i<n;i++) c[i]=pcm[i]-mean;
 
-  // ∇φ — Thomas smooth (λ=3)
-  const grad=thomasSmooth(c,3);
+  // ∇φ — tonal: Thomas smooth (λ=12, smoother cutoff) + chorus shimmer
+  const grad=thomasSmooth(c, 12);
+  // chorus: blend with slightly delayed+pitched version
+  const chorus=new Float32Array(n);
+  const delayS=Math.floor(SR*0.018); // 18ms delay
+  for(let i=0;i<n;i++){
+    const d=i>delayS ? grad[i-delayS]*0.38 : 0;
+    chorus[i]=grad[i]*0.75 + d;
+  }
 
-  // δψ — solenoidal residual with threshold
+  // δψ — transient: residual, gated — only keep peaks above local RMS
+  const raw=new Float32Array(n);
+  for(let i=0;i<n;i++) raw[i]=c[i]-grad[i];
+  // local RMS gate (128-sample window)
+  const W=128;
   const sol=new Float32Array(n);
-  const THR=1e-3;
-  for(let i=0;i<n;i++){const s=c[i]-grad[i]; sol[i]=Math.abs(s)<THR?0:s;}
+  for(let i=0;i<n;i++){
+    let rms=0; const s=Math.max(0,i-W), e=Math.min(n,i+W);
+    for(let j=s;j<e;j++) rms+=raw[j]*raw[j];
+    rms=Math.sqrt(rms/(e-s));
+    sol[i]=Math.abs(raw[i])>rms*0.8 ? raw[i]*1.4 : 0;
+  }
 
-  // h — harmonic invariant: amplitude envelope × fundamental tone
-  // envelope = |pcm| smoothed very heavily (λ=500)
+  // h — harmonic invariant: rich overtone series (organ) × slow envelope
   const absP=new Float32Array(n); for(let i=0;i<n;i++) absP[i]=Math.abs(pcm[i]);
-  const env=thomasSmooth(absP, 500);
-  // fundamental frequency
-  const f0=dominantFreq(pcm.subarray(0,Math.min(n,sr)), sr||44100);
+  const env=thomasSmooth(absP, 800); // very slow envelope
+  const f0=dominantFreq(pcm.subarray(0,Math.min(n,SR*2)), SR);
   const harm=new Float32Array(n);
-  const twoPiF0=2*Math.PI*f0/(sr||44100);
-  for(let i=0;i<n;i++) harm[i]=Math.sin(twoPiF0*i)*env[i]*0.8;
+  // organ harmonics: f0 + f0×2 + f0×3 + f0×4 (decaying weights)
+  const harmonics=[[1,0.55],[2,0.28],[3,0.14],[4,0.07],[5,0.03]];
+  for(let i=0;i<n;i++){
+    let s=0;
+    for(const [k,w] of harmonics) s+=Math.sin(2*Math.PI*f0*k/SR*i)*w;
+    harm[i]=s*env[i]*0.7;
+  }
 
-  return {grad, sol, harm, f0};
+  return {grad:chorus, sol, harm, f0};
 }
 
 // Audio state
