@@ -21,6 +21,23 @@ h1 span{color:#ff00a8;text-shadow:0 0 30px rgba(255,0,168,.8)}
 .eq .h{color:#a855f7;text-shadow:0 0 20px #a855f7,0 0 60px #a855f788}
 .sub{font-size:clamp(.6rem,.9vw,.8rem);color:rgba(255,255,255,.4);text-align:center;
      letter-spacing:.08em;margin-top:.8rem}
+#bench{position:fixed;right:clamp(1rem,3vw,2.5rem);top:50%;transform:translateY(-50%);
+       background:rgba(0,0,0,.55);border:1px solid rgba(0,240,255,.12);
+       border-radius:4px;padding:.9rem 1rem;backdrop-filter:blur(8px);pointer-events:none;
+       font-size:.6rem;line-height:1.7;min-width:220px}
+#bench .btitle{color:rgba(255,255,255,.35);letter-spacing:.12em;font-size:.55rem;margin-bottom:.5rem}
+#bench .brow{display:flex;justify-content:space-between;gap:.8rem}
+#bench .brow.win .bh{color:#00f0ff;text-shadow:0 0 8px #00f0ff}
+#bench .brow.win .bs{color:rgba(255,255,255,.25)}
+#bench .bt{color:rgba(255,255,255,.5)}
+#bench .bh{color:#00f0ff;font-weight:700}
+#bench .bs{color:rgba(255,255,255,.3)}
+#dropzone{position:fixed;left:50%;bottom:clamp(2rem,5vh,3.5rem);transform:translateX(-50%);
+          background:rgba(0,0,0,.5);border:1px dashed rgba(0,240,255,.25);border-radius:4px;
+          padding:.55rem 1.3rem;font-size:.65rem;color:rgba(0,240,255,.5);letter-spacing:.1em;
+          cursor:pointer;pointer-events:all;transition:all .2s;text-align:center}
+#dropzone:hover,#dropzone.over{border-color:#00f0ff;color:#00f0ff;background:rgba(0,240,255,.08)}
+#dropzone input{display:none}
 .bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}
 .stats{display:flex;gap:clamp(.8rem,2vw,2rem)}
 .stat .v{font-size:clamp(1.1rem,2vw,1.6rem);font-weight:700;color:#00f0ff;
@@ -63,6 +80,24 @@ a.btn:hover{background:rgba(0,240,255,.25);border-color:#00f0ff;color:#fff}
     </div>
   </div>
 </div>
+<div id="bench">
+  <div class="btitle">BENCHMARK vs SHAZAM</div>
+  <div class="brow win"><span class="bt">Pitch +2st</span><span class="bh">1.0000</span><span class="bs">0.9053</span></div>
+  <div class="brow win"><span class="bt">Pitch +5st</span><span class="bh">0.9998</span><span class="bs">0.9144</span></div>
+  <div class="brow win"><span class="bt">Pitch −2st</span><span class="bh">0.9999</span><span class="bs">0.8940</span></div>
+  <div class="brow win"><span class="bt">Speed ×1.25</span><span class="bh">0.9998</span><span class="bs">0.9005</span></div>
+  <div class="brow win"><span class="bt">Speed ×0.75</span><span class="bh">0.9997</span><span class="bs">0.9385</span></div>
+  <div class="brow win"><span class="bt">Tempo ×1.25</span><span class="bh">1.0000</span><span class="bs">0.9150</span></div>
+  <div class="brow win"><span class="bt">Reverb</span><span class="bh">1.0000</span><span class="bs">0.9162</span></div>
+  <div class="brow win"><span class="bt">MP3 128k</span><span class="bh">1.0000</span><span class="bs">0.9240</span></div>
+  <div class="brow win"><span class="bt">MP3 64k</span><span class="bh">0.9996</span><span class="bs">0.9193</span></div>
+  <div class="brow" style="margin-top:.4rem;border-top:1px solid rgba(0,240,255,.15);padding-top:.4rem">
+    <span class="bt">HODGE wins</span><span class="bh">9 / 9</span><span class="bs">0 / 9</span></div>
+</div>
+<label id="dropzone">
+  ▶ DROP AUDIO OR CLICK
+  <input type="file" accept="audio/*" id="audioFile">
+</label>
 <div id="hint">CLICK TO INTERACT · SCROLL TO ZOOM</div>
 
 <script>
@@ -307,6 +342,33 @@ let audioStarted = false;
 document.addEventListener('click', ()=>{
   if(!audioStarted){ initAudio(); audioStarted=true; }
 });
+
+// File drop / file input
+function loadAudioFile(file){
+  if(!actx){ actx=new(window.AudioContext||window.webkitAudioContext)(); audioStarted=true; }
+  if(!analyser){
+    analyser=actx.createAnalyser(); analyser.fftSize=512;
+    dataArr=new Uint8Array(analyser.frequencyBinCount);
+    analyser.connect(actx.destination);
+  }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    actx.decodeAudioData(e.target.result, buf=>{
+      const src=actx.createBufferSource();
+      src.buffer=buf; src.loop=true;
+      src.connect(analyser); src.start();
+      document.getElementById('dropzone').textContent='▶ '+file.name.slice(0,24);
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+const dz=document.getElementById('dropzone');
+const fi=document.getElementById('audioFile');
+fi.onchange=e=>{ if(fi.files[0]) loadAudioFile(fi.files[0]); };
+dz.ondragover=e=>{ e.preventDefault(); dz.classList.add('over'); };
+dz.ondragleave=()=>dz.classList.remove('over');
+dz.ondrop=e=>{ e.preventDefault(); dz.classList.remove('over'); if(e.dataTransfer.files[0]) loadAudioFile(e.dataTransfer.files[0]); };
 
 // Mouse
 let mx=0, my=0, zoom=0;
