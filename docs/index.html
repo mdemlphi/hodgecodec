@@ -403,18 +403,9 @@ function hodgeDecompose(pcm, sr){
     chorus[i]=grad[i]*0.75 + d;
   }
 
-  // δψ — transient: residual, gated — only keep peaks above local RMS
-  const raw=new Float32Array(n);
-  for(let i=0;i<n;i++) raw[i]=c[i]-grad[i];
-  // local RMS gate (128-sample window)
-  const W=128;
+  // δψ — transient: full residual (high-pass character, no hard gate)
   const sol=new Float32Array(n);
-  for(let i=0;i<n;i++){
-    let rms=0; const s=Math.max(0,i-W), e=Math.min(n,i+W);
-    for(let j=s;j<e;j++) rms+=raw[j]*raw[j];
-    rms=Math.sqrt(rms/(e-s));
-    sol[i]=Math.abs(raw[i])>rms*0.8 ? raw[i]*1.4 : 0;
-  }
+  for(let i=0;i<n;i++) sol[i]=(c[i]-grad[i])*1.3;
 
   // h — harmonic invariant: rich overtone series (organ) × slow envelope
   const absP=new Float32Array(n); for(let i=0;i<n;i++) absP[i]=Math.abs(pcm[i]);
@@ -429,7 +420,18 @@ function hodgeDecompose(pcm, sr){
     harm[i]=s*env[i]*0.7;
   }
 
-  return {grad:chorus, sol, harm, f0};
+  // normalize each component to 0.85 peak
+  function norm(buf){
+    let pk=0; for(let i=0;i<buf.length;i++) pk=Math.max(pk,Math.abs(buf[i]));
+    if(pk>0.001) for(let i=0;i<buf.length;i++) buf[i]=buf[i]/pk*0.85;
+    return buf;
+  }
+  // soft limiter (tanh-based)
+  function limit(buf){
+    for(let i=0;i<buf.length;i++) buf[i]=Math.tanh(buf[i]*1.1)*0.9;
+    return buf;
+  }
+  return {grad:limit(norm(chorus)), sol:limit(norm(sol)), harm:limit(norm(harm)), f0};
 }
 
 // Audio state
